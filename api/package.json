@@ -1,0 +1,25 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "router1": "set PORT=4000 && node router.js",
+    "router2": "set PORT=4001 && node router.js",
+    "router3": "set PORT=4002 && node router.js",
+    "start-routers": "concurrently \"npm run router1\" \"npm run router2\" \"npm run router3\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "the network project",
+  "dependencies": {
+    "concurrently": "^9.1.2",
+    "crypto": "^1.0.1",
+    "express": "^4.21.2",
+    "nodemon": "^3.1.9",
+    "peerjs": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  }
+}
