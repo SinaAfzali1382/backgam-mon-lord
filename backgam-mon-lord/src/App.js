@@ -42,6 +42,7 @@ function App() {
         "background-color : aqua;";
     }
   };
+
   const rollTheDice = () => {
     if (board.currentPlayer.isFinish()) {
       board.currentPlayer.rollTheDice();
@@ -266,7 +267,9 @@ function App() {
           {/* Bar in the middle */}
           <div className="bar">
             <div class="dice" onClick={rollTheDice}>
-              <div className="dice-value">{dice.value1}/{dice.value2}</div>
+              <div className="dice-value">
+                {dice.value1}/{dice.value2}
+              </div>
             </div>
             <div className="pair-dice">{dice.isPair && "×2"}</div>
           </div>

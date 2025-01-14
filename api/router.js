@@ -1,59 +1,49 @@
 const io = require("socket.io")(process.env.PORT, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
-
-const route = [
-  "http://localhost:4001", // روتر دوم
-  "http://localhost:4002", // روتر سوم
-];
-
-const socketPool = {}; // نگهداری سوکت‌ها برای هر مقصد
-
-const getSocket = (destination) => {
-  if (!socketPool[destination]) {
-    socketPool[destination] = require("socket.io-client")(destination);
-    console.log(`Created new socket connection to ${destination}`);
+socketPool = {};
+const getSocketToNext = (port) => {
+  if (!socketPool[port]) {
+    socketPool[port] = require("socket.io-client")(port);
+    console.log(`Created new connection to ${port}`);
   }
-  return socketPool[destination];
+  return socketPool[port];
 };
-
+const getNextPort = (port) => {
+  let nextPort = Number(port);
+  if (nextPort !== 4002 && nextPort !== 3001) nextPort += 1;
+  else if (nextPort !== 3001) nextPort = 3001;
+  else nextPort = null;
+  return nextPort;
+};
 io.on("connection", (socket) => {
   console.log(`Router connected: ${socket.id}`);
 
-  socket.on("route_message", (data, callback) => {
-    console.log("Message received at router:", data);
-
-    // بررسی مقصد بعدی
-    const nextDestination = route.shift();
-
-    if (nextDestination) {
-      // دریافت یا ایجاد سوکت به مقصد بعدی
-      const nextSocket = getSocket(nextDestination);
-
+  socket.on("ready", (data, callback) => {
+    let nextPort = getNextPort(Number(process.env.PORT));
+    if (nextPort) {
+      const nextSocket = getSocketToNext("http://localhost:" + nextPort);
       nextSocket.emit(
-        "route_message",
-        data, // ارسال داده بدون رمزنگاری
+        "ready",
+        nextPort === 4001 ? String(socket.id) : data,
         (response) => {
-          // ارسال پاسخ به کلاینت اصلی
           callback(response);
         }
       );
-    } else {
-      // پیام به سرور نهایی ارسال می‌شود
-      const finalServer = getSocket("http://localhost:5000");
-      finalServer.emit("process_message", data.data, (response) => {
-        console.log("Response from final server:", response);
-
-        // ارسال پاسخ به کلاینت
-        callback({ result: response });
+    }
+  });
+  socket.on("startGame", (data, callback) => {
+    let nextPort = getNextPort(Number(process.env.PORT));
+    if (nextPort) {
+      const nextSocket = getSocketToNext("http://localhost:" + nextPort);
+      nextSocket.emit("startGame", data, (response) => {
+        callback(response);
       });
     }
   });
 
   socket.on("disconnect", () => {
-    console.log("Router disconnected:", socket.id);
+    console.log(`Router disconnected: ${socket.id}`);
   });
 });
 
