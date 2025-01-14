@@ -1,0 +1,68 @@
+body {
+    background-image: url('p3.jpg');
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+  }
+  
+  .lobby-container {
+    display: flex;             /* Add flexbox */
+    flex-direction: column;    /* Arrange children in a column */
+    align-items: center;       /* Center items vertically */
+    height: 100vh;             /* Full viewport height */
+    text-align: center;
+    padding: 20px;
+  }
+  
+
+  /* welcome */
+  .curved-text-container {
+    text-align: center;
+    margin: 20px;
+  }
+  
+  .welcome {
+    font-size: 47px;
+    fill: #ffffff;
+    font-family: Arial, sans-serif;
+  }
+  
+  h1 {
+    font-size: 36px;
+    margin-bottom: 20px;
+  }
+  
+
+
+  /* player list */
+  ul {
+    background: rgba(255, 255, 255, 0.1); 
+    backdrop-filter: blur(10px); 
+    -webkit-backdrop-filter: blur(10px); 
+    border-radius: 10px; 
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    list-style-type: none;
+    width: 400px;
+  }
+  
+  li {
+    font-size: 24px;
+    margin: 10px 0;
+  }
+
+
+
+  .builders{
+    background-image: url('p4.png');
+    background-size: cover;
+    
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+
+    margin-top: 230px;
+    margin-right: 1800px;
+  }
