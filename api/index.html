@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Peer-to-Peer</title>
+</head>
+<body>
+    <h1>WebRTC Peer-to-Peer Chat</h1>
+    <textarea id="log" readonly rows="10" cols="50"></textarea><br>
+    <input id="message" type="text" placeholder="Type a message" />
+    <button id="send">Send</button><br>
+    <button id="connect">Connect</button>
+    <select id="clients"></select>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const log = document.getElementById('log');
+        const messageInput = document.getElementById('message');
+        const sendButton = document.getElementById('send');
+        const connectButton = document.getElementById('connect');
+        const clientsDropdown = document.getElementById('clients');
+
+        const socket = io('http://localhost:3000'); // اتصال به سرور سیگنال‌دهی
+        const peerConnection = new RTCPeerConnection();
+        let dataChannel;
+
+        // لاگ کردن پیام‌ها
+        function logMessage(message) {
+            log.value += `${message}\n`;
+        }
+
+        // دریافت لیست کلاینت‌ها
+        socket.emit('request-clients');
+        socket.on('clients', (clients) => {
+            clientsDropdown.innerHTML = '';
+            clients.forEach((clientId) => {
+                if (clientId !== socket.id) {
+                    const option = document.createElement('option');
+                    option.value = clientId;
+                    option.textContent = clientId;
+                    clientsDropdown.appendChild(option);
+                }
+            });
+        });
+
+        // ایجاد DataChannel برای ارسال پیام
+        connectButton.addEventListener('click', async () => {
+            const targetClientId = clientsDropdown.value;
+            if (!targetClientId) return logMessage('No client selected');
+
+            dataChannel = peerConnection.createDataChannel('chat');
+            setupDataChannel();
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            socket.emit('signal', { to: targetClientId, data: { type: 'offer', sdp: offer.sdp } });
+            logMessage('Offer sent to ' + targetClientId);
+        });
+
+        // تنظیم DataChannel
+        function setupDataChannel() {
+            dataChannel.onopen = () => logMessage('DataChannel opened');
+            dataChannel.onmessage = (event) => logMessage(`Peer: ${event.data}`);
+        }
+
+        // ارسال پیام از طریق DataChannel
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value;
+            dataChannel.send(message);
+            logMessage(`You: ${message}`);
+            messageInput.value = '';
+        });
+
+        // دریافت سیگنال‌ها
+        socket.on('signal', async ({ from, data }) => {
+            if (data.type === 'offer') {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.emit('signal', { to: from, data: { type: 'answer', sdp: answer.sdp } });
+                logMessage('Answer sent to ' + from);
+            } else if (data.type === 'answer') {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                logMessage('Connected to ' + from);
+            } else if (data.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data));
+                logMessage('ICE Candidate added');
+            }
+        });
+
+        // تنظیم ICE Candidate
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                const targetClientId = clientsDropdown.value;
+                socket.emit('signal', { to: targetClientId, data: { candidate: event.candidate } });
+            }
+        };
+
+        // زمانی که DataChannel از طرف دیگر ایجاد شد
+        peerConnection.ondatachannel = (event) => {
+            dataChannel = event.channel;
+            setupDataChannel();
+        };
+    </script>
+</body>
+</html>
