@@ -91,22 +91,53 @@ app.get("/game/validHome/:id/:numberHome/", (req, res) => {
 app.get("/game/destinations/:id/:numberHome/", (req, res) => {
   const playerId = req.params.id;
   const numberHome = req.params.numberHome;
-  console.log(playerId);
-  console.log(numberHome);
   const currGame = Games.filter(
     (game) =>
       (game.player1.id === playerId || game.player2.id === playerId) &&
       game.currentPlayer.id === playerId
   );
-  console.log(currGame[0].currentPlayer.id);
   let dest = currGame[0].currentPlayer.destinations(Number(numberHome));
-  console.log(dest);
   dest = dest.filter(
     (item) =>
       !currGame[0].closedHouses(currGame[0].currentPlayer.name).includes(item)
   );
-  console.log(dest);
   res.json(dest);
+});
+app.get("/game/move/:id/:source/:dest/", (req, res) => {
+  const playerId = req.params.id;
+  let source = req.params.source;
+  let dest = req.params.dest;
+  source = Number(source);
+  dest = Number(dest);
+  const currGame = Games.filter(
+    (game) =>
+      (game.player1.id === playerId || game.player2.id === playerId) &&
+      game.currentPlayer.id === playerId
+  );
+  let dest2 = currGame[0].currentPlayer.destinations(Number(source));
+  dest2 = dest2.filter(
+    (item) =>
+      !currGame[0].closedHouses(currGame[0].currentPlayer.name).includes(item)
+  );
+  dest2 = dest2.filter((item) => item === dest);
+  if (dest2?.length > 0) {
+    if (currGame[0].player1.id === playerId) {
+      let pices = currGame[0].player1.getPices();
+      pices[source] = pices[source] - 1;
+      pices[dest] = pices[dest] + 1;
+      currGame[0].player1.setPieces(pices);
+      currGame[0].setPices();
+      currGame[0].player1.updateDice(Math.abs(dest - source));
+    } else if (currGame[0].player2.id === playerId) {
+      let pices = currGame[0].player2.getPices();
+      pices[source] = pices[source] - 1;
+      pices[dest] = pices[dest] + 1;
+      currGame[0].player2.setPieces(pices);
+      currGame[0].setPices();
+      currGame[0].player2.updateDice(Math.abs(dest - source));
+    }
+  }
+  res.json(currGame);
 });
 /////////////////////  end api  ///////////////////////////////
 

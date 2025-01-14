@@ -56,7 +56,7 @@ function App() {
           setCurrPlayerImage(
             data?.currentPlayer.name === 1 ? player1Image : player2Image
           );
-        }, 500);
+        }, 200);
       });
   };
   const getDistinations = async (numberHome) => {
@@ -65,6 +65,21 @@ function App() {
         sessionStorage.getItem("id") +
         "/" +
         numberHome
+    );
+    if (!response.ok) {
+      throw new Error("Network response was not ok " + response.statusText);
+    }
+    const data = await response.json();
+    return data;
+  };
+  const movePiece = async (source, dest) => {
+    const response = await fetch(
+      "http://localhost:5000/game/move/" +
+        sessionStorage.getItem("id") +
+        "/" +
+        source +
+        "/" +
+        dest
     );
     if (!response.ok) {
       throw new Error("Network response was not ok " + response.statusText);
@@ -115,114 +130,46 @@ function App() {
             setMoveClick(true);
             setColorForHouses(dest);
           }
-        } else if (moveClick) {
-          fetch(
-            "http://localhost:5000/game/validHome/" +
-              sessionStorage.getItem("id") +
-              numberHome
-          )
-            .then((response) => {
-              return response.json();
-            })
-            .then((data) => {
-              setColorForHouses([]);
-              let dest = board.currentPlayer.destinations(lastClick);
-              dest = dest.filter(
-                (item) =>
-                  !board.closedHouses(board.currentPlayer.name).includes(item)
-              );
-              dest = dest.filter((item) => {
-                return item === numberHome;
-              });
-              if (board.currentPlayer.name === board.player1.name) {
-                let pices = board.player1.getPices();
-                pices[lastClick] = pices[lastClick] - 1;
-                pices[dest[0]] = pices[dest[0]] + 1;
-                board.player1.setPieces(pices);
-                board.setPices();
-                setHouses(board.houses);
-                board.player1.updateDice(Math.abs(dest[0] - lastClick));
-                setDice(board.player1.dice);
-              } else {
-                let pices = board.player2.getPices();
-                pices[lastClick] = pices[lastClick] - 1;
-                pices[dest[0]] = pices[dest[0]] + 1;
-                board.player2.setPieces(pices);
-                board.setPices();
-                setHouses(board.houses);
-                board.player2.updateDice(Math.abs(dest[0] - lastClick));
-                setDice(board.player2.dice);
-              }
-              if (board.currentPlayer.isFinish()) {
-                board.changeCurrentPlayer();
-                setCurrPlayerImage(
-                  board.currentPlayer.name === player.white
-                    ? player1Image
-                    : player2Image
-                );
-                setDice(board.currentPlayer.dice);
-              }
-              setMoveClick(false);
-              setLastClick(null);
+        } else if (
+          moveClick &&
+          (await getDistinations(lastClick)).filter((item) => {
+            return item === numberHome;
+          }).length > 0
+        ) {
+          setColorForHouses([]);
+          let dest = await getDistinations(lastClick);
+          dest = dest.filter((item) => {
+            return item === numberHome;
+          });
+          await movePiece(lastClick, numberHome);
+          setTimeout(() => {
+            getGame().then(async () => {
+              await rollDice();
             });
+          }, 200);
+          // setTimeout(() => {
+          //   if (board.currentPlayer.isFinish()) {
+          //     board.changeCurrentPlayer();
+          //     setCurrPlayerImage(
+          //       board.currentPlayer.name === player.white
+          //         ? player1Image
+          //         : player2Image
+          //     );
+          //     setDice(board.currentPlayer.dice);
+          //   }
+          // }, 3000);
+          setMoveClick(false);
+          setLastClick(null);
         }
       });
-    // if (
-    //   moveClick &&
-    //   board.currentPlayer
-    //     .destinations(lastClick)
-    //     .filter(
-    //       (item) => !board.closedHouses(board.currentPlayer.name).includes(item)
-    //     )
-    //     .includes(numberHome)
-    // ) {
-    //   setColorForHouses([]);
-    //   let dest = board.currentPlayer.destinations(lastClick);
-    //   dest = dest.filter(
-    //     (item) => !board.closedHouses(board.currentPlayer.name).includes(item)
-    //   );
-    //   dest = dest.filter((item) => {
-    //     return item === numberHome;
-    //   });
-    //   if (board.currentPlayer.name === board.player1.name) {
-    //     let pices = board.player1.getPices();
-    //     pices[lastClick] = pices[lastClick] - 1;
-    //     pices[dest[0]] = pices[dest[0]] + 1;
-    //     board.player1.setPieces(pices);
-    //     board.setPices();
-    //     setHouses(board.houses);
-    //     board.player1.updateDice(Math.abs(dest[0] - lastClick));
-    //     setDice(board.player1.dice);
-    //   } else {
-    //     let pices = board.player2.getPices();
-    //     pices[lastClick] = pices[lastClick] - 1;
-    //     pices[dest[0]] = pices[dest[0]] + 1;
-    //     board.player2.setPieces(pices);
-    //     board.setPices();
-    //     setHouses(board.houses);
-    //     board.player2.updateDice(Math.abs(dest[0] - lastClick));
-    //     setDice(board.player2.dice);
-    //   }
-    //   if (board.currentPlayer.isFinish()) {
-    //     board.changeCurrentPlayer();
-    //     setCurrPlayerImage(
-    //       board.currentPlayer.name === player.white
-    //         ? player1Image
-    //         : player2Image
-    //     );
-    //     setDice(board.currentPlayer.dice);
-    //   }
-    //   setMoveClick(false);
-    //   setLastClick(null);
-    // }
   };
 
   useEffect(() => {
-    setTimeout(() => {
+    setInterval(() => {
       getGame().then(async () => {
         await rollDice();
       });
-    }, 500);
+    }, 1500);
   }, []);
   return (
     <div className="App">
