@@ -82,11 +82,10 @@ app.get("/game/validHome/:id/:numberHome/", (req, res) => {
       (game.player1.id === playerId || game.player2.id === playerId) &&
       game.currentPlayer.id === playerId
   );
-  res.json(
-    currGame[0]
-      .myHouses(currGame[0].currentPlayer.name)
-      .includes(Number(numberHome))
-  );
+  let result = currGame[0]
+    .myHouses(currGame[0].currentPlayer.name)
+    .includes(Number(numberHome));
+  res.json(result);
 });
 app.get("/game/destinations/:id/:numberHome/", (req, res) => {
   const playerId = req.params.id;
