@@ -1,0 +1,74 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Node.js dependencies
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.19.1"
+
+      - run: |
+          npm install
+
+      - name: Zip application files
+        run: |
+          tar --exclude=application.tar.gz -czf /tmp/application.tar.gz .
+          mv /tmp/application.tar.gz ./
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Preparation
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          # Disable strict host key checking to avoid the verification issue
+          export SSH_OPTIONS="-o StrictHostKeyChecking=no"
+          ssh $SSH_OPTIONS $SSH_USER@$SSH_HOST << 'EOF'
+            echo "Removed directory"
+            rm -rf /var/www/homepage/
+            mkdir /var/www/homepage
+          EOF
+
+      - name: Deploy application
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          # Disable strict host key checking to avoid the verification issue
+          export SSH_OPTIONS="-o StrictHostKeyChecking=no"
+          # Copy the tarball to the remote server
+          rsync -v --info=progress2 -e "ssh $SSH_OPTIONS" application.tar.gz $SSH_USER@$SSH_HOST:/var/www/homepage/
+          # Execute commands on the remote server
+          ssh $SSH_OPTIONS $SSH_USER@$SSH_HOST << 'EOF'
+            cd /var/www/homepage
+            tar -xzf application.tar.gz
+            npm install
+            sudo chown -R $(whoami):$(whoami) .
+            sudo chmod -R u+w node_modules
+            mkdir -p /var/www/homepage/public/assets/
+            sudo ln -s /var/www/cdn/images/ /var/www/homepage/public/assets/
+            find config -type f -name "*.dist" -exec bash -c 'cp "$0" "${0%.dist}"' {} \;
+            printf "DB_PASS='${{ secrets.DB_PASSWORD }}'\n" >> .env
+            printf "MAIL_PASSWORD='${{ secrets.MAIL_PASSWORD }}'\n" >> .env
+            printf "DB_HOST='localhost'\n" cat >> .env
+            printf "DB_NAME='db'\n" cat >> .env
+            rm application.tar.gz
+            npm run build
+            /usr/local/bin/pm2 restart homepage
+            sudo systemctl restart nginx
+          EOF
