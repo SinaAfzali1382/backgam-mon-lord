@@ -141,7 +141,7 @@ class Player {
     } else {
       destination = uniqueSumsList
         .filter((item) => {
-          return item !== 0 && item + currentPiece <= houseNumber.TwentyFour;
+          return item !== 0 && item + currentPiece < houseNumber.TwentyFour;
         })
         .map((item) => item + currentPiece);
     }

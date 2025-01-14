@@ -51,6 +51,63 @@ app.get("/player/startGame/:player1/:player2", (req, res) => {
   client1.startGame(player2);
   res.json(null);
 });
+
+app.get("/game/rollDice/:id/", (req, res) => {
+  const playerId = req.params.id;
+  const currGame = Games.filter(
+    (game) => game.player1.id === playerId || game.player2.id === playerId
+  );
+  if (currGame[0] && currGame[0].currentPlayer.isFinish()) {
+    currGame[0].currentPlayer.getName() === 1
+      ? (currGame[0].currentPlayer = currGame[0].player2)
+      : (currGame[0].currentPlayer = currGame[0].player1);
+    currGame[0].currentPlayer.rollTheDice();
+    res.json(currGame[0]);
+  }
+  res.json(currGame[0]);
+});
+app.get("/game/all/info/:id/", (req, res) => {
+  const playerId = req.params.id;
+  const currGame = Games.filter(
+    (game) => game.player1.id === playerId || game.player2.id === playerId
+  );
+  res.json(currGame[0]);
+});
+
+app.get("/game/validHome/:id/:numberHome/", (req, res) => {
+  const playerId = req.params.id;
+  const numberHome = req.params.numberHome;
+  const currGame = Games.filter(
+    (game) =>
+      (game.player1.id === playerId || game.player2.id === playerId) &&
+      game.currentPlayer.id === playerId
+  );
+  res.json(
+    currGame[0]
+      .myHouses(currGame[0].currentPlayer.name)
+      .includes(Number(numberHome))
+  );
+});
+app.get("/game/destinations/:id/:numberHome/", (req, res) => {
+  const playerId = req.params.id;
+  const numberHome = req.params.numberHome;
+  console.log(playerId);
+  console.log(numberHome);
+  const currGame = Games.filter(
+    (game) =>
+      (game.player1.id === playerId || game.player2.id === playerId) &&
+      game.currentPlayer.id === playerId
+  );
+  console.log(currGame[0].currentPlayer.id);
+  let dest = currGame[0].currentPlayer.destinations(Number(numberHome));
+  console.log(dest);
+  dest = dest.filter(
+    (item) =>
+      !currGame[0].closedHouses(currGame[0].currentPlayer.name).includes(item)
+  );
+  console.log(dest);
+  res.json(dest);
+});
 /////////////////////  end api  ///////////////////////////////
 
 io.on("connection", (socket) => {
@@ -64,12 +121,11 @@ io.on("connection", (socket) => {
   socket.on("startGame", (data, callback) => {
     // بازگرداندن آیدی کلاینت
     if (waitingPlayers.length >= 2) {
-      Games.push(
-        new Game(
-          new Player(player.white, data.player1),
-          new Player(player.black, data.player2)
-        )
+      const newGame = new Game(
+        new Player(player.white, data.player1),
+        new Player(player.black, data.player2)
       );
+      Games.push(newGame);
       waitingPlayers = waitingPlayers.filter(
         (item) => item !== data.player1 && item !== data.player2
       );

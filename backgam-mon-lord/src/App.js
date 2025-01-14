@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
-import { Board, Player } from "./utilities";
 import { player } from "./enums";
 import messagIcon from "./message.jpg";
 import player1Image from "./p1.png";
 import player2Image from "./p2.png";
+import { Board, Player } from "./utilities";
 function App() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const toggleSidebar = () => {
@@ -25,16 +25,69 @@ function App() {
     }
   };
 
-  const [board] = useState(
-    new Board(new Player(player.white), new Player(player.black))
-  );
-  const [houses, setHouses] = useState(board.houses);
-  const [currPlayerImage, setCurrPlayerImage] = useState(
-    board.currentPlayer.getName() === player.white ? player1Image : player2Image
-  );
-  const [dice, setDice] = useState(board.currentPlayer.getDice());
+  //////////////////////////////////////////////////////////////
+  const getGame = async () => {
+    fetch("http://localhost:5000/game/all/info/" + sessionStorage.getItem("id"))
+      .then((response) => {
+        return response.json();
+      })
+      .then((data) => {
+        setBoard(data);
+        setHouses(data.houses);
+        setCurrPlayerImage(
+          data?.currentPlayer.name === 1 ? player1Image : player2Image
+        );
+      });
+  };
+  const rollDice = async () => {
+    fetch("http://localhost:5000/game/rollDice/" + sessionStorage.getItem("id"))
+      .then((response) => {
+        return response.json();
+      })
+      .then(async (data) => {
+        setTimeout(() => {
+          let myDice =
+            data?.currentPlayer.id === sessionStorage.getItem("id")
+              ? data?.currentPlayer.dice
+              : { value1: 0, value2: 0, value3: 0, value4: 0, isPair: false };
+          setDice(myDice);
+          setBoard(data);
+          setHouses(data.houses);
+          setCurrPlayerImage(
+            data?.currentPlayer.name === 1 ? player1Image : player2Image
+          );
+        }, 500);
+      });
+  };
+  const getDistinations = async (numberHome) => {
+    const response = await fetch(
+      "http://localhost:5000/game/destinations/" +
+        sessionStorage.getItem("id") +
+        "/" +
+        numberHome
+    );
+    if (!response.ok) {
+      throw new Error("Network response was not ok " + response.statusText);
+    }
+    const data = await response.json();
+    return data;
+  };
+  const [board, setBoard] = useState();
+  if (!board) getGame();
+
+  const [houses, setHouses] = useState(board?.houses);
+  const [currPlayerImage, setCurrPlayerImage] = useState();
+  const [dice, setDice] = useState({
+    value1: 0,
+    value2: 0,
+    value3: 0,
+    value4: 0,
+    isPair: false,
+  });
+
   const [moveClick, setMoveClick] = useState(false);
   const [lastClick, setLastClick] = useState(null);
+
   const setColorForHouses = (selectedHouses) => {
     for (let i = 0; i < 24; i++) document.getElementById("home" + i).style = "";
     for (let i = 0; i < selectedHouses.length; i++) {
@@ -43,79 +96,134 @@ function App() {
     }
   };
 
-  const rollTheDice = () => {
-    if (board.currentPlayer.isFinish()) {
-      board.currentPlayer.rollTheDice();
-      setDice(board.currentPlayer.getDice());
-    }
-  };
-  const handleClick = (numberHome) => {
-    if (
-      board.myHouses(board.currentPlayer.getName()).includes(numberHome) &&
-      !moveClick
-    ) {
-      setColorForHouses([]);
-      let dest = board.currentPlayer.destinations(numberHome);
-      dest = dest.filter(
-        (item) =>
-          !board.closedHouses(board.currentPlayer.getName()).includes(item)
-      );
-      if (dest.length > 0) {
-        setLastClick(numberHome);
-        setMoveClick(true);
-      }
-      setColorForHouses(dest);
-    } else if (
-      moveClick &&
-      board.currentPlayer
-        .destinations(lastClick)
-        .filter(
-          (item) =>
-            !board.closedHouses(board.currentPlayer.getName()).includes(item)
-        )
-        .includes(numberHome)
-    ) {
-      setColorForHouses([]);
-      let dest = board.currentPlayer.destinations(lastClick);
-      dest = dest.filter(
-        (item) =>
-          !board.closedHouses(board.currentPlayer.getName()).includes(item)
-      );
-      dest = dest.filter((item) => {
-        return item === numberHome;
+  const handleClick = async (numberHome) => {
+    fetch(
+      "http://localhost:5000/game/validHome/" +
+        sessionStorage.getItem("id") +
+        "/" +
+        numberHome
+    )
+      .then((response) => {
+        return response.json();
+      })
+      .then(async (data) => {
+        if (data && !moveClick) {
+          setColorForHouses([]);
+          let dest = await getDistinations(numberHome);
+          if (dest.length > 0) {
+            setLastClick(numberHome);
+            setMoveClick(true);
+            setColorForHouses(dest);
+          }
+        } else if (moveClick) {
+          fetch(
+            "http://localhost:5000/game/validHome/" +
+              sessionStorage.getItem("id") +
+              numberHome
+          )
+            .then((response) => {
+              return response.json();
+            })
+            .then((data) => {
+              setColorForHouses([]);
+              let dest = board.currentPlayer.destinations(lastClick);
+              dest = dest.filter(
+                (item) =>
+                  !board.closedHouses(board.currentPlayer.name).includes(item)
+              );
+              dest = dest.filter((item) => {
+                return item === numberHome;
+              });
+              if (board.currentPlayer.name === board.player1.name) {
+                let pices = board.player1.getPices();
+                pices[lastClick] = pices[lastClick] - 1;
+                pices[dest[0]] = pices[dest[0]] + 1;
+                board.player1.setPieces(pices);
+                board.setPices();
+                setHouses(board.houses);
+                board.player1.updateDice(Math.abs(dest[0] - lastClick));
+                setDice(board.player1.dice);
+              } else {
+                let pices = board.player2.getPices();
+                pices[lastClick] = pices[lastClick] - 1;
+                pices[dest[0]] = pices[dest[0]] + 1;
+                board.player2.setPieces(pices);
+                board.setPices();
+                setHouses(board.houses);
+                board.player2.updateDice(Math.abs(dest[0] - lastClick));
+                setDice(board.player2.dice);
+              }
+              if (board.currentPlayer.isFinish()) {
+                board.changeCurrentPlayer();
+                setCurrPlayerImage(
+                  board.currentPlayer.name === player.white
+                    ? player1Image
+                    : player2Image
+                );
+                setDice(board.currentPlayer.dice);
+              }
+              setMoveClick(false);
+              setLastClick(null);
+            });
+        }
       });
-      if (board.currentPlayer.getName() === board.player1.getName()) {
-        let pices = board.player1.getPices();
-        pices[lastClick] = pices[lastClick] - 1;
-        pices[dest[0]] = pices[dest[0]] + 1;
-        board.player1.setPieces(pices);
-        board.setPices();
-        setHouses(board.houses);
-        board.player1.updateDice(Math.abs(dest[0] - lastClick));
-        setDice(board.player1.getDice());
-      } else {
-        let pices = board.player2.getPices();
-        pices[lastClick] = pices[lastClick] - 1;
-        pices[dest[0]] = pices[dest[0]] + 1;
-        board.player2.setPieces(pices);
-        board.setPices();
-        setHouses(board.houses);
-        board.player2.updateDice(Math.abs(dest[0] - lastClick));
-        setDice(board.player2.getDice());
-      }
-      if (board.currentPlayer.isFinish()) {
-        board.changeCurrentPlayer();
-        setCurrPlayerImage(
-          board.currentPlayer.getName() === player.white
-            ? player1Image
-            : player2Image
-        );
-        setDice(board.currentPlayer.getDice());
-      }
-      setMoveClick(false);
-      setLastClick(null);
-    }
+    // if (
+    //   moveClick &&
+    //   board.currentPlayer
+    //     .destinations(lastClick)
+    //     .filter(
+    //       (item) => !board.closedHouses(board.currentPlayer.name).includes(item)
+    //     )
+    //     .includes(numberHome)
+    // ) {
+    //   setColorForHouses([]);
+    //   let dest = board.currentPlayer.destinations(lastClick);
+    //   dest = dest.filter(
+    //     (item) => !board.closedHouses(board.currentPlayer.name).includes(item)
+    //   );
+    //   dest = dest.filter((item) => {
+    //     return item === numberHome;
+    //   });
+    //   if (board.currentPlayer.name === board.player1.name) {
+    //     let pices = board.player1.getPices();
+    //     pices[lastClick] = pices[lastClick] - 1;
+    //     pices[dest[0]] = pices[dest[0]] + 1;
+    //     board.player1.setPieces(pices);
+    //     board.setPices();
+    //     setHouses(board.houses);
+    //     board.player1.updateDice(Math.abs(dest[0] - lastClick));
+    //     setDice(board.player1.dice);
+    //   } else {
+    //     let pices = board.player2.getPices();
+    //     pices[lastClick] = pices[lastClick] - 1;
+    //     pices[dest[0]] = pices[dest[0]] + 1;
+    //     board.player2.setPieces(pices);
+    //     board.setPices();
+    //     setHouses(board.houses);
+    //     board.player2.updateDice(Math.abs(dest[0] - lastClick));
+    //     setDice(board.player2.dice);
+    //   }
+    //   if (board.currentPlayer.isFinish()) {
+    //     board.changeCurrentPlayer();
+    //     setCurrPlayerImage(
+    //       board.currentPlayer.name === player.white
+    //         ? player1Image
+    //         : player2Image
+    //     );
+    //     setDice(board.currentPlayer.dice);
+    //   }
+    //   setMoveClick(false);
+    //   setLastClick(null);
+    // }
   };
+
+  useEffect(() => {
+    setTimeout(() => {
+      getGame().then(async () => {
+        await rollDice();
+      });
+    }, 500);
+  }, []);
   return (
     <div className="App">
       <div className="App-header">
@@ -173,11 +281,11 @@ function App() {
           <div className="half-board">
             {/* Top triangles */}
             <div className="row top">
-              {houses.slice(12, 18).map((item, index) => (
+              {houses?.slice(12, 18).map((item, index) => (
                 <div
                   key={index}
                   className={`triangle triangle-up ${
-                    board.currentPlayer.getName() === player.white
+                    board.currentPlayer.name === player.white
                       ? index % 2 === 0
                         ? "dark"
                         : "light"
@@ -218,11 +326,11 @@ function App() {
 
             {/* Bottom triangles */}
             <div className="row bottom">
-              {houses.slice(6, 12).map((item, index) => (
+              {houses?.slice(6, 12).map((item, index) => (
                 <div
                   key={index}
                   className={`triangle triangle-down ${
-                    board.currentPlayer.getName() === player.white
+                    board?.currentPlayer.name === player.white
                       ? index % 2 === 0
                         ? "dark"
                         : "light"
@@ -266,12 +374,12 @@ function App() {
 
           {/* Bar in the middle */}
           <div className="bar">
-            <div class="dice" onClick={rollTheDice}>
+            <div class="dice">
               <div className="dice-value">
-                {dice.value1}/{dice.value2}
+                {dice?.value1}/{dice?.value2}
               </div>
             </div>
-            <div className="pair-dice">{dice.isPair && "×2"}</div>
+            <div className="pair-dice">{dice?.isPair && "×2"}</div>
           </div>
 
           {/* ------------------------------------------------------------------------------------------------ */}
@@ -281,11 +389,11 @@ function App() {
           <div className="half-board">
             {/* Top triangles */}
             <div className="row top">
-              {houses.slice(18, 24).map((item, index) => (
+              {houses?.slice(18, 24).map((item, index) => (
                 <div
                   key={index}
                   className={`triangle triangle-up ${
-                    board.currentPlayer.getName() === player.white
+                    board.currentPlayer.name === player.white
                       ? index % 2 === 0
                         ? "dark"
                         : "light"
@@ -326,11 +434,11 @@ function App() {
 
             {/* Bottom triangles */}
             <div className="row bottom">
-              {houses.slice(0, 6).map((item, index) => (
+              {houses?.slice(0, 6).map((item, index) => (
                 <div
                   key={index}
                   className={`triangle triangle-down ${
-                    board.currentPlayer.getName() === player.white
+                    board.currentPlayer.name === player.white
                       ? index % 2 === 0
                         ? "dark"
                         : "light"
